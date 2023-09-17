@@ -25,6 +25,11 @@ namespace CodeGenerator
                 outputPath = AppContext.BaseDirectory;
             }
 
+            if (!Directory.Exists(outputPath))
+            {
+                Directory.CreateDirectory(outputPath);
+            }
+
             string libraryName;
             if (args.Length > 1)
             {
@@ -79,14 +84,14 @@ namespace CodeGenerator
 
             foreach (EnumDefinition ed in defs.Enums)
             {
-                using (CSharpCodeWriter writer = new CSharpCodeWriter(Path.Combine(outputPath, ed.FriendlyName + ".gen.cs")))
+                using (CSharpCodeWriter writer = new CSharpCodeWriter(Path.Combine(outputPath, ed.FriendlyNames[0] + ".gen.cs")))
                 {
                     writer.PushBlock($"namespace {projectNamespace}");
-                    if (ed.FriendlyName.Contains("Flags"))
+                    if (ed.FriendlyNames[0].Contains("Flags"))
                     {
                         writer.WriteLine("[System.Flags]");
                     }
-                    writer.PushBlock($"public enum {ed.FriendlyName}");
+                    writer.PushBlock($"public enum {ed.FriendlyNames[0]}");
                     foreach (EnumMember member in ed.Members)
                     {
                         string sanitizedName = ed.SanitizeNames(member.Name);
@@ -458,7 +463,7 @@ namespace CodeGenerator
                 safeRet = GetSafeType(overload.ReturnType);
             }
 
-            List<string> invocationArgs = new List<string>();
+            List<(string MarshalledType, string CorrectedIdentifier)> invocationArgs = new();
             MarshalledParameter[] marshalledParameters = new MarshalledParameter[overload.Parameters.Length];
             List<string> preCallLines = new List<string>();
             List<string> postCallLines = new List<string>();
@@ -642,15 +647,33 @@ namespace CodeGenerator
 
                 if (!marshalledParameters[i].HasDefaultValue)
                 {
-                    invocationArgs.Add($"{marshalledParameters[i].MarshalledType} {correctedIdentifier}");
+                    invocationArgs.Add((marshalledParameters[i].MarshalledType, correctedIdentifier));
                 }
             }
 
-            string invocationList = string.Join(", ", invocationArgs);
+            string invocationList = string.Join(", ", invocationArgs.Select(a => $"{a.MarshalledType} {a.CorrectedIdentifier}"));
             string friendlyName = overload.FriendlyName;
 
             string staticPortion = selfName == null ? "static " : string.Empty;
-            writer.PushBlock($"public {staticPortion}{overrideRet ?? safeRet} {friendlyName}({invocationList})");
+            
+            if (invocationArgs.Count > 0 && invocationArgs.Any(a => a is { MarshalledType: "string" }))
+            {
+                string readOnlySpanInvocationList = string.Join(", ", invocationArgs.Select(a => $"{(a.MarshalledType == "string" ? "ReadOnlySpan<char>" : a.MarshalledType)} {a.CorrectedIdentifier}"));
+                writer.WriteRaw($$"""
+                    #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_1_OR_GREATER
+                            public {{staticPortion}}{{overrideRet ?? safeRet}} {{friendlyName}}({{readOnlySpanInvocationList}})
+                    #else
+                            public {{staticPortion}}{{overrideRet ?? safeRet}} {{friendlyName}}({{invocationList}})
+                    #endif
+                            {
+                    """);
+                writer.IndentManually();
+            }
+            else
+            {
+                writer.PushBlock($"public {staticPortion}{overrideRet ?? safeRet} {friendlyName}({invocationList})");
+            }
+            
             foreach (string line in preCallLines)
             {
                 writer.WriteLine(line);
