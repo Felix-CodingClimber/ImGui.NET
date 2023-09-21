@@ -3,6 +3,8 @@
 		<TargetFramework>net8.0-windows</TargetFramework>
 		<RuntimeIdentifier>win10-x64</RuntimeIdentifier>
 		<Platforms>x64</Platforms>
+		<!-- Needed for .NET 8 see https://learn.microsoft.com/en-us/dotnet/core/compatibility/deployment/8.0/rid-asset-list#recommended-action -->
+		<UseRidGraph>true</UseRidGraph>
 		<AssemblyVersion>1.89.7.1</AssemblyVersion>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<RootNamespace>ImGuiNET</RootNamespace>
