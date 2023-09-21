@@ -24,10 +24,4 @@
 	<ItemGroup>
 		<Folder Include="Generated\" />
 	</ItemGroup>
-	
-	<ItemGroup>
-	  <None Update="cimgui.dll">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	</ItemGroup>
 </Project>
